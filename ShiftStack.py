@@ -23,10 +23,12 @@ def _parse_args():
     )
     parser.add_argument(
         "speed_ra",
+        type=float,
         help=""
     )
     parser.add_argument(
         "speed_dec",
+        type=float,
         help=""
     )
     parser.add_argument(
