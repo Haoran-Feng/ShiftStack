@@ -107,13 +107,6 @@ class FitsFile:
         except IndexError:
             self.data = np.zeros((self.roi_width, self.roi_height), dtype=np.int32)
         else:
+            min_value = self.data.min()
             self.data = self.data - bkg
-            objects = sep.extract(self.data, threshold, err=bkg.globalrms)
-            self.objects_list = [item for item in objects]
-            self.objects_list.sort(key=lambda item:item['peak'], reverse=False)
-            # Using sep to mask bright stars
-            self.mask = np.zeros(self.data.shape, dtype=bool)
-            sep.mask_ellipse(self.mask, objects['x'], objects['y'], objects['a'], objects['b'], objects['theta'], r=r)
-            self.data[self.mask] = 0
-        # fits.writeto(self.file_full_name + "_mid2.fits", self.data)
-
+            self.data[self.data > threshold * bkg.globalrms] = min_value

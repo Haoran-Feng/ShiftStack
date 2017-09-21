@@ -20,3 +20,13 @@ recommended.
 Besides, if the FITS file's header is in SCAMP mode, not SIP,
 we need to install astrometry-net and using its wcs-pv2sip.
 
+
+[Work to do]
+- Use a better way to delete bright stars from images, so only
+the signal from faint objects won't be missed.
+
+- Find a way to crop FITS image without damaging wcs data,
+so that we can use DS9 to know the RA and DEC of suspects.
+
+- Finish my paperwork and pass it to my partner.
+

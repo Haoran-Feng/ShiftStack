@@ -12,12 +12,12 @@ def _parse_args():
         help="Specify the path that contains FITS files.",
     )
     parser.add_argument(
-        "Center_ra",
+        "center_ra",
         type=str,
         help=""
     )
     parser.add_argument(
-        "Center_dec",
+        "center_dec",
         type=str,
         help=""
     )
@@ -42,17 +42,17 @@ def _parse_args():
         help=""
     )
     parser.add_argument(
-        "Output",
+        "output",
         help="Specify the name that you wanna store the output FITS file."
     )
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = _parse_args()
-    coord = SkyCoord(args.Center_ra, args.Center_dec, frame='icrs', unit=(u.hourangle, u.deg))
+    coord = SkyCoord(args.center_ra, args.center_dec, frame='icrs', unit=(u.hourangle, u.deg))
     imseq = ImgSeq(args.source)
     result = imseq.shift_stack(coord, target_speed_ra=args.speed_ra, target_speed_dec=args.speed_dec,
                                region_width=args.width, region_height=args.height, if_remove_field_star=True,
                                threshold=1.8)
-    fits.writeto(args.Output, result)
+    fits.writeto(args.output, result, overwrite=True)
 
