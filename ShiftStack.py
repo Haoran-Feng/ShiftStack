@@ -31,10 +31,12 @@ def _parse_args():
     )
     parser.add_argument(
         "width",
+        type=int,
         help=""
     )
     parser.add_argument(
         "height",
+        type=int,
         help=""
     )
     parser.add_argument(
