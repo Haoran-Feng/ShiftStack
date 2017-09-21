@@ -11,3 +11,12 @@ one single pixel, making it easier to detect.
 
 This project is just starting up.
 
+
+# Install the python packages we need
+numpy, astropy, sep can be installed with pip, and of course,
+you need to have a version of python first. Python3.5+ is
+recommended.
+
+Besides, if the FITS file's header is in SCAMP mode, not SIP,
+we need to install astrometry-net and using its wcs-pv2sip.
+
