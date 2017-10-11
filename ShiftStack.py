@@ -4,6 +4,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from shift_stack.ImgSeq import ImgSeq
 from shift_stack.FitsFile import FitsFile
+
 import os
 
 def _parse_args():
@@ -20,7 +21,7 @@ def _parse_args():
         "--coord_pixel",
         dest='center_coord_pixel',
         nargs=3,
-        metavar=("FitsName", "RowIndex", "ColumnIndex"),
+        metavar=("FitsName", "X", "Y"),
         type=str,
         default=None,
         help="Specify a Fits File and stacking around one of its pixels."
@@ -42,7 +43,23 @@ def _parse_args():
         nargs=2,
         metavar=('(RA in arcsec/hr)', "(DEC in arcsec/hr)"),
         type=float,
-        help="Speed of this stacking."
+        help="Speed of this stacking. Default to be 0, 0.",
+        default=(0, 0)
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        dest="if_list",
+        help="Flag for listing FITS image information."
+    )
+    parser.add_argument(
+        "--number",
+        dest="fits_collection_to_stack",
+        nargs=2,
+        type=int,
+        metavar=("START", "END"),
+        help="Use --list to check the FITS list before selecting images to stack"
+
     )
     parser.add_argument(
         "--size",
@@ -74,14 +91,33 @@ def _parse_args():
     )
     return parser.parse_args()
 
+'''
+def list_fits_files(imseq: ImgSeq):
+    print("No.   Cover                         Time            ")
+    print("----------------------------------------------------")
+    for item, index in enumerate(imseq.fits_objects):
+        corner_row = [item.height-1, item.height-1, 0, 0]
+        corner_col = [0, item.width-1, 0, item.width-1]
+        wcs_world_coord = item.wcs.wcs_pix2world()
+        
+        
+        left_down = SkyCoord(item.wcs.wcs_pix2world(0, 0, True), )
+        print("{0}  {1} {2} {3}".format(index, ))
+        print("     {0} {1}")
+'''
+
 if __name__ == '__main__':
     args = _parse_args()
+
+    if args.if_list:
+        imseq = ImgSeq(args.source)
 
     if args.center_coord_pixel is None:
         coord = SkyCoord(args.center_coord[0], args.center_coord[1], frame='icrs', unit=(u.hourangle, u.deg))
     else:
         basis_fits = FitsFile(args.source, args.center_coord_pixel[0])
         coord = basis_fits.wcs.wcs_pix2world(int(args.center_coord_pixel[1]), int(args.center_coord_pixel[2]),True)
+        pix_coord = basis_fits.wcs.wcs_world2pix(coord[0], coord[1], True)
         coord = SkyCoord(coord[0], coord[1], frame='icrs', unit=(u.deg, u.deg))
 
     imseq = ImgSeq(args.source)

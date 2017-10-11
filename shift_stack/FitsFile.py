@@ -42,8 +42,8 @@ class FitsFile:
             self.time = self.header['date-wrt']  # Get UTC time.
             self.timestamp = time.mktime(time.strptime(self.time[0:19], "%Y-%m-%dT%H:%M:%S"))
             self.exposure_time = self.header['exptime']  # Get exposure time.
-            self.height = self.header['naxis1']
-            self.width = self.header['naxis2']
+            self.width = self.header['naxis1']
+            self.height = self.header['naxis2']
 
             if 'PV1_5' in self.header.keys():
                 # SCAMP header
@@ -71,20 +71,26 @@ class FitsFile:
         if origin_coord is None:
             origin_pix = (int(self.height / 2 - height / 2), int(self.width / 2 - width / 2))
         else:
-            origin_pix = self.wcs.wcs_world2pix(origin_coord.ra.deg, origin_coord.dec.deg, True)
-            origin_pix = [round(float(item)) for item in origin_pix]
+            origin_pix_reverse = self.wcs.wcs_world2pix(origin_coord.ra.deg, origin_coord.dec.deg, True)
+            origin_pix_reverse = [round(float(item)) for item in origin_pix_reverse]
+            origin_pix = [origin_pix_reverse[1], origin_pix_reverse[0]]
+            # print("While stacking {0}, ra:{1} dec:{2} pix X:{3} pix Y:{4}".format(self.file_full_name,
+            #                                                                       origin_coord.ra.deg,
+            #                                                                       origin_coord.dec.deg,
+            #                                                                       origin_pix[1],
+            #                                                                       origin_pix[0]))
 
         if not width/2 < origin_pix[0] < self.width - width // 2 and height/2 < origin_pix[1] < self.height - height//2:
             print("ROI out of boundary in fits %s" % self.file_full_name)
-            self.data = np.zeros((width, height), dtype=np.int32)
+            self.data = np.zeros((height, width), dtype=np.int32)
             return self.data
 
         try:
             file = fits.open(self.file_full_name)
-            self.orgin_x = origin_pix[0]
-            self.orgin_y = origin_pix[1]
-            self.data = file[0].data[self.orgin_y - height//2:self.orgin_y + height//2,
-                                     self.orgin_x - width//2:self.orgin_x + width//2]
+            self.orgin_height = origin_pix[0]
+            self.orgin_width = origin_pix[1]
+            self.data = file[0].data[self.orgin_height - height//2:self.orgin_height + height//2,
+                                     self.orgin_width - width//2:self.orgin_width + width//2]
             self.data = np.array(self.data, dtype=np.int32)
             file.close()
 

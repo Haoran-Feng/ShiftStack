@@ -4,7 +4,7 @@ import os
 from enum import Enum
 import numpy as np
 import astropy.units as u
-from astropy.utils.console import ProgressBar
+from tqdm import tqdm
 
 
 
@@ -52,24 +52,23 @@ class ImgSeq:
         print("%s FITS images to stack, with speed_ra=%sarcsec/hr, speed_dec=%sarcsec/hr"
               % (len(self.fits_objects), target_speed_ra, target_speed_dec))
 
-        self.fits_objects[0].get_data(origin_coord, region_width, region_height)
+        self.fits_objects[0].get_data(origin_coord, region_height, region_width)
         if if_remove_field_star:
             self.fits_objects[0].set_mask(threshold=threshold)
-        self.img_data = self.fits_objects[0].data
-        for index, gap in enumerate(self.fits_time_gap):
-            print("FITS No.%s stacking..." % (index + 2))
-            delta_ra = gap * (target_speed_ra / 3600) / 3600
-            delta_dec = gap * (target_speed_dec / 3600) / 3600
-            new_origin = SkyCoord(origin_coord.ra.deg + delta_ra,
-                                  origin_coord.dec.deg + delta_dec, unit='deg')
-            origin_coord = new_origin
-            self.fits_objects[index + 1].get_data(new_origin, region_width, region_height)
-            if if_remove_field_star:
-                self.fits_objects[index + 1].set_mask(threshold=threshold)
-            self.img_data += self.fits_objects[index + 1].data
-            print('Done')
+        with tqdm(total=len(self.fits_objects), ncols=90) as pbar:
+            self.img_data = self.fits_objects[0].data
+            pbar.update(1)
+            for index, gap in enumerate(self.fits_time_gap):
+                # print("FITS No.%s stacking..." % (index + 2))
+                delta_ra = gap * (target_speed_ra / 3600) / 3600
+                delta_dec = gap * (target_speed_dec / 3600) / 3600
+                new_origin = SkyCoord(origin_coord.ra.deg + delta_ra,
+                                      origin_coord.dec.deg + delta_dec, unit='deg')
+                origin_coord = new_origin
+                self.fits_objects[index + 1].get_data(new_origin, region_height, region_width)
+                if if_remove_field_star:
+                    self.fits_objects[index + 1].set_mask(threshold=threshold)
+                self.img_data += self.fits_objects[index + 1].data
+                pbar.update(1)
 
         return self.img_data
-
-
-
