@@ -42,8 +42,8 @@ class FitsFile:
             self.time = self.header['date-wrt']  # Get UTC time.
             self.timestamp = time.mktime(time.strptime(self.time[0:19], "%Y-%m-%dT%H:%M:%S"))
             self.exposure_time = self.header['exptime']  # Get exposure time.
-            self.width = self.header['naxis1']
-            self.height = self.header['naxis2']
+            self.height = self.header['naxis1']
+            self.width = self.header['naxis2']
 
             if 'PV1_5' in self.header.keys():
                 # SCAMP header
@@ -60,16 +60,16 @@ class FitsFile:
                 self.wcs.fix()
                 file_sip.close()
 
-    def get_data(self, origin_coord: SkyCoord=None, width: int=4000, height: int=4000) -> np.ndarray:
+    def get_data(self, origin_coord: SkyCoord=None, height: int=4000, width: int=4000) -> np.ndarray:
         """
         Get image data from FITS file related with current FitsFile instance.
         :return: Image Data Matrix
         """
         # file = fits.open(self.file_full_name)
-        self.roi_width = width
         self.roi_height = height
+        self.roi_width = width
         if origin_coord is None:
-            origin_pix = (int(self.width / 2 - width / 2), int(self.height / 2 - height / 2))
+            origin_pix = (int(self.height / 2 - height / 2), int(self.width / 2 - width / 2))
         else:
             origin_pix = self.wcs.wcs_world2pix(origin_coord.ra.deg, origin_coord.dec.deg, True)
             origin_pix = [round(float(item)) for item in origin_pix]
@@ -83,8 +83,8 @@ class FitsFile:
             file = fits.open(self.file_full_name)
             self.orgin_x = origin_pix[0]
             self.orgin_y = origin_pix[1]
-            self.data = file[0].data.T[self.orgin_x - width//2:self.orgin_x + width//2,
-                                       self.orgin_y - height//2:self.orgin_y + height//2]
+            self.data = file[0].data[self.orgin_y - height//2:self.orgin_y + height//2,
+                                     self.orgin_x - width//2:self.orgin_x + width//2]
             self.data = np.array(self.data, dtype=np.int32)
             file.close()
 
@@ -94,7 +94,7 @@ class FitsFile:
 
         return self.data
 
-    def set_mask(self, threshold: float=2, r: float=1.5):
+    def set_mask(self, threshold: float):
         """
         Set mask on bright stars.
         :return:
@@ -104,9 +104,10 @@ class FitsFile:
         self.data = np.array(self.data, dtype=np.int32)
         try:
             bkg = sep.Background(self.data)
+            print('backgroundvalue', bkg.globalback, 'globalrms', bkg.globalrms, sep=' ')
         except IndexError:
             self.data = np.zeros((self.roi_width, self.roi_height), dtype=np.int32)
         else:
-            min_value = self.data.min()
             self.data = self.data - bkg
-            self.data[self.data > threshold * bkg.globalrms] = min_value
+            self.data[self.data < 0] = 0
+            self.data[self.data > threshold * bkg.globalrms] = 0

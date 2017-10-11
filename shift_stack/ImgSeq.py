@@ -54,10 +54,10 @@ class ImgSeq:
 
         self.fits_objects[0].get_data(origin_coord, region_width, region_height)
         if if_remove_field_star:
-            self.fits_objects[0].set_mask(threshold=threshold, r=5.5)
+            self.fits_objects[0].set_mask(threshold=threshold)
         self.img_data = self.fits_objects[0].data
         for index, gap in enumerate(self.fits_time_gap):
-            print("FITS No.%s stacking..." % (index + 2), end='')
+            print("FITS No.%s stacking..." % (index + 2))
             delta_ra = gap * (target_speed_ra / 3600) / 3600
             delta_dec = gap * (target_speed_dec / 3600) / 3600
             new_origin = SkyCoord(origin_coord.ra.deg + delta_ra,
@@ -65,11 +65,11 @@ class ImgSeq:
             origin_coord = new_origin
             self.fits_objects[index + 1].get_data(new_origin, region_width, region_height)
             if if_remove_field_star:
-                self.fits_objects[index + 1].set_mask(threshold=threshold, r=5.5)
+                self.fits_objects[index + 1].set_mask(threshold=threshold)
             self.img_data += self.fits_objects[index + 1].data
             print('Done')
 
-        return self.img_data.T
+        return self.img_data
 
 
 
