@@ -4,6 +4,8 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from shift_stack.ImgSeq import ImgSeq
 from shift_stack.FitsFile import FitsFile
+import datetime
+import re
 
 import os
 
@@ -17,15 +19,15 @@ def _parse_args():
         default=os.getcwd()
     )
 
-    parser.add_argument(
-        "--coord_pixel",
-        dest='center_coord_pixel',
-        nargs=3,
-        metavar=("FitsName", "X", "Y"),
-        type=str,
-        default=None,
-        help="Specify a Fits File and stacking around one of its pixels."
-    )
+    # parser.add_argument(
+    #     "--coord_pixel",
+    #     dest='center_coord_pixel',
+    #     nargs=3,
+    #     metavar=("FitsName", "X", "Y"),
+    #     type=str,
+    #     default=None,
+    #     help="Specify a Fits File and stacking around one of its pixels."
+    # )
 
     parser.add_argument(
         "--coord",
@@ -54,12 +56,19 @@ def _parse_args():
     )
     parser.add_argument(
         "--number",
-        dest="fits_collection_to_stack",
+        dest="fits_index",
         nargs=2,
         type=int,
-        metavar=("START", "END"),
+        metavar=("BEGIN", "END"),
         help="Use --list to check the FITS list before selecting images to stack"
-
+    )
+    parser.add_argument(
+        "-dr",
+        dest="dilation_radius",
+        nargs=1,
+        type=int,
+        default=4,
+        help="The radius to use when dilate mask image."
     )
     parser.add_argument(
         "--size",
@@ -82,47 +91,76 @@ def _parse_args():
     parser.add_argument(
         "--nomask",
         action='store_false',
-        dest='mask',
+        dest='hasmask',
         help='Flag for removing field stars.'
     )
     parser.add_argument(
-        "Output",
+        "--output",
+        nargs=1,
+        dest="output_filename",
+        type=str,
+        default=None,
         help="Specify the name that you wanna store the output FITS file."
     )
     return parser.parse_args()
 
-'''
-def list_fits_files(imseq: ImgSeq):
-    print("No.   Cover                         Time            ")
-    print("----------------------------------------------------")
-    for item, index in enumerate(imseq.fits_objects):
-        corner_row = [item.height-1, item.height-1, 0, 0]
-        corner_col = [0, item.width-1, 0, item.width-1]
-        wcs_world_coord = item.wcs.wcs_pix2world()
-        
-        
-        left_down = SkyCoord(item.wcs.wcs_pix2world(0, 0, True), )
-        print("{0}  {1} {2} {3}".format(index, ))
-        print("     {0} {1}")
-'''
-
 if __name__ == '__main__':
+
+    # Parse args
     args = _parse_args()
 
+    # if detect '--list', print FITS information list.
     if args.if_list:
-        imseq = ImgSeq(args.source)
+        imseq = ImgSeq(args.source, True)
+        raise SystemExit
+    #
+    # if args.center_coord_pixel is None:
+    #     coord = SkyCoord(args.center_coord[0], args.center_coord[1], frame='icrs', unit=(u.hourangle, u.deg))
+    coord = SkyCoord(args.center_coord[0], args.center_coord[1], frame='icrs', unit=(u.hourangle, u.deg))
+    # else:
+    #     basis_fits = FitsFile(args.source, args.center_coord_pixel[0])
+    #     coord = basis_fits.wcs.wcs_pix2world(int(args.center_coord_pixel[1]), int(args.center_coord_pixel[2]),True)
+    #     pix_coord = basis_fits.wcs.wcs_world2pix(coord[0], coord[1], True)
+    #     coord = SkyCoord(coord[0], coord[1], frame='icrs', unit=(u.deg, u.deg))
 
-    if args.center_coord_pixel is None:
-        coord = SkyCoord(args.center_coord[0], args.center_coord[1], frame='icrs', unit=(u.hourangle, u.deg))
+    # Ready FITS file information
+    if args.fits_index is None:
+        args.fits_index = [None, None]
+    imseq = ImgSeq(args.source,
+                   list_all_fits=False,
+                   origin_coord=coord,
+                   ROI_height=args.size[0],
+                   ROI_width=args.size[1],
+                   target_speed_ra=args.speed[0],
+                   target_speed_dec=args.speed[1],
+                   index_begin=args.fits_index[0],
+                   index_end=args.fits_index[1],
+                   if_mask=args.hasmask,
+                   dilation_radius=args.dilation_radius
+                   )
+
+    # Pre-processing
+    imseq.read_into_memory()
+    # imseq.remove_background()
+    imseq.generate_mask()
+
+    # Stacking image
+    result = imseq.shift_stack_in_memory()
+
+    # Use or generate filename for output.
+    if args.output_filename is None:
+        output = 'RA' + str(args.speed[0]).replace('.', '_') + '-' + \
+                 'DEC' + str(args.speed[1]).replace('.', '_') + '-' + \
+                 'with' + str(imseq.actual_fits_number) + 'fits' + '_' + \
+                 re.sub(r'[^0-9]','',str(datetime.datetime.now())) + '.fits'
     else:
-        basis_fits = FitsFile(args.source, args.center_coord_pixel[0])
-        coord = basis_fits.wcs.wcs_pix2world(int(args.center_coord_pixel[1]), int(args.center_coord_pixel[2]),True)
-        pix_coord = basis_fits.wcs.wcs_world2pix(coord[0], coord[1], True)
-        coord = SkyCoord(coord[0], coord[1], frame='icrs', unit=(u.deg, u.deg))
+        output = args.output_filename[0]
 
-    imseq = ImgSeq(args.source)
-    result = imseq.shift_stack(coord, target_speed_ra=args.speed[0], target_speed_dec=args.speed[1],
-                               region_width=args.size[1], region_height=args.size[0], if_remove_field_star=args.mask,
-                               threshold=args.threshold)
-    fits.writeto(args.Output, result, overwrite=True)
+    fits.writeto(output, result, overwrite=True)
+    print("File " + output + " saved. Enjoy!")
+
+    # result = imseq.shift_stack(coord, target_speed_ra=args.speed[0], target_speed_dec=args.speed[1],
+    #                            region_width=args.size[1], region_height=args.size[0], if_remove_field_star=args.mask,
+    #                            threshold=args.threshold)
+    #fits.writeto(args.output_filename, result, overwrite=True)
 

@@ -20,6 +20,8 @@ def exec_pv2sip(file_full_name: str) -> bool:
         return True
 
 
+
+
 class FitsFile:
     def __init__(self, file_path: str, file_name: str):
         """
@@ -43,7 +45,9 @@ class FitsFile:
             self.timestamp = time.mktime(time.strptime(self.time[0:19], "%Y-%m-%dT%H:%M:%S"))
             self.exposure_time = self.header['exptime']  # Get exposure time.
             self.width = self.header['naxis1']
-            self.height = self.header['naxis2']
+            self.height= self.header['naxis2']
+            self.sigma = self.header['sigmback']
+            self.back  = self.header['meanback']
 
             if 'PV1_5' in self.header.keys():
                 # SCAMP header
@@ -74,46 +78,51 @@ class FitsFile:
             origin_pix_reverse = self.wcs.wcs_world2pix(origin_coord.ra.deg, origin_coord.dec.deg, True)
             origin_pix_reverse = [round(float(item)) for item in origin_pix_reverse]
             origin_pix = [origin_pix_reverse[1], origin_pix_reverse[0]]
-            # print("While stacking {0}, ra:{1} dec:{2} pix X:{3} pix Y:{4}".format(self.file_full_name,
-            #                                                                       origin_coord.ra.deg,
-            #                                                                       origin_coord.dec.deg,
-            #                                                                       origin_pix[1],
-            #                                                                       origin_pix[0]))
 
         if not width/2 < origin_pix[0] < self.width - width // 2 and height/2 < origin_pix[1] < self.height - height//2:
             print("ROI out of boundary in fits %s" % self.file_full_name)
-            self.data = np.zeros((height, width), dtype=np.int32)
-            return self.data
+            return np.zeros((height, width), dtype=np.uint16)
 
         try:
             file = fits.open(self.file_full_name)
             self.orgin_height = origin_pix[0]
             self.orgin_width = origin_pix[1]
-            self.data = file[0].data[self.orgin_height - height//2:self.orgin_height + height//2,
+            data = file[0].data[self.orgin_height - height//2:self.orgin_height + height//2,
                                      self.orgin_width - width//2:self.orgin_width + width//2]
-            self.data = np.array(self.data, dtype=np.int32)
+            data = np.array(data, dtype=np.uint16)
             file.close()
 
         except TypeError:
             print('file {0} has been damaged...'.format(self.file_full_name))
-            self.data = np.zeros((width, height), dtype=np.int32)
+            data = np.zeros((height, width), dtype=np.uint16)
 
-        return self.data
+        return data
+
+    """
 
     def set_mask(self, threshold: float):
-        """
-        Set mask on bright stars.
-        :return:
-        """
+       
         # Using sep to detect bright stars
+        threshold = float(threshold[0])
         self.data = self.data.copy(order='C')
         self.data = np.array(self.data, dtype=np.int32)
         try:
             bkg = sep.Background(self.data)
-            print('backgroundvalue', bkg.globalback, 'globalrms', bkg.globalrms, sep=' ')
+            # print('backgroundvalue', bkg.globalback, 'globalrms', bkg.globalrms, sep=' ')
+
         except IndexError:
-            self.data = np.zeros((self.roi_width, self.roi_height), dtype=np.int32)
+            self.data = np.zeros((self.roi_height, self.roi_width), dtype=np.int32)
         else:
-            self.data = self.data - bkg
-            self.data[self.data < 0] = 0
-            self.data[self.data > threshold * bkg.globalrms] = 0
+            self.data[self.mask_function(bkg, threshold)] = 0
+
+    def mask_function(self, bkg, threshold: float) -> np.ndarray:
+        # data[data < 0] = 0
+        # data[data > threshold * bkg.globalrms] = 0
+        bkg.subfrom(self.data)
+        objs = sep.extract(self.data, threshold)
+        mask = np.zeros((self.roi_height, self.roi_height), dtype=bool)
+        sep.mask_ellipse(mask, objs['x'], objs['y'], objs['a'], objs['b'], objs['theta'], r= 5.0)
+        return mask
+
+    """
+
